@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="author" content="Matúš Surmaj">
+<title>Ekonómia 3 – prezentácie</title>
+<style>
+:root{--bg:#f4f4f2;--card:#fff;--ink:#2e3236;--mut:#6b7178;--or:#f28c28;--or2:#fde6cc;--gr:#3a3f44;--line:#dcdcd8}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1d2023;--card:#2a2e32;--ink:#f1f1ee;--mut:#a5abb2;--or2:#4a3115;--gr:#15171a;--line:#3d4247}}
+:root[data-theme="dark"]{--bg:#1d2023;--card:#2a2e32;--ink:#f1f1ee;--mut:#a5abb2;--or2:#4a3115;--gr:#15171a;--line:#3d4247}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+header{background:var(--gr);color:#fff;padding:calc(clamp(32px,7vw,80px) + env(safe-area-inset-top,0px)) 0 clamp(28px,5vw,56px)}
+.wrap{width:100%;max-width:1200px;margin:0 auto;padding-left:clamp(16px,5vw,64px);padding-right:clamp(16px,5vw,64px)}
+.tag{display:inline-block;background:var(--or);color:#fff;font-weight:700;padding:6px 14px;border-radius:6px;font-size:clamp(13px,1.6vw,16px);margin-bottom:14px}
+h1{font-size:clamp(36px,7vw,72px);margin:0 0 10px;line-height:1.05}
+h1 span{color:var(--or)}
+.sub{color:#d6d8da;font-size:clamp(16px,2.2vw,22px);margin:0}
+main{flex:1;padding-top:clamp(24px,4vw,48px);padding-bottom:48px}
+.head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 20px;margin-bottom:20px}
+h2{font-size:clamp(20px,2.6vw,28px);margin:0;padding-left:14px;border-left:6px solid var(--or)}
+h2 small{color:var(--mut);font-weight:400}
+.search{flex:0 1 340px;min-width:0;font:inherit;font-size:16px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+.search::placeholder{color:var(--mut)}
+.search:focus{outline:3px solid var(--or);outline-offset:1px;border-color:transparent}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));gap:16px}
+.c{display:flex;flex-direction:column;gap:8px;background:var(--card);border:1px solid var(--line);border-top:6px solid var(--or);border-radius:10px;padding:18px 20px;color:inherit;text-decoration:none;transition:transform .15s,box-shadow .15s}
+.c:hover{transform:translateY(-3px);box-shadow:0 8px 24px #00000024}
+.c:focus-visible{outline:3px solid var(--or);outline-offset:2px}
+.num{align-self:flex-start;background:var(--or2);font-weight:700;border-radius:6px;padding:3px 10px;font-size:14px;font-variant-numeric:tabular-nums}
+.c b{font-size:clamp(18px,2vw,22px);line-height:1.25}
+.desc{color:var(--mut);font-size:15px;line-height:1.45}
+.meta{margin-top:auto;padding-top:8px;display:flex;flex-wrap:wrap;gap:4px 12px;color:var(--mut);font-size:14px;font-variant-numeric:tabular-nums}
+.meta i{font-style:normal;color:var(--or);font-weight:700;margin-left:auto}
+.msg{grid-column:1/-1;margin:0;background:var(--or2);border-left:6px solid var(--or);padding:14px 18px;border-radius:6px;font-size:16px;line-height:1.5}
+footer{border-top:1px solid var(--line);color:var(--mut);font-size:14px;padding:18px 0 calc(18px + env(safe-area-inset-bottom,0px))}
+footer b{color:var(--ink)}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+<span class="tag">Predmet</span>
+<h1>Ekonómia 3<span>.</span></h1>
+<p class="sub">Prezentácie k jednotlivým témam</p>
+</div></header>
+<main class="wrap">
+<div class="head">
+<h2>Prezentácie <small id="cnt"></small></h2>
+<input class="search" id="q" type="search" placeholder="Hľadať v prezentáciách…" aria-label="Hľadať v prezentáciách" autocomplete="off">
+</div>
+<div class="grid" id="list"><p class="msg">Načítavam prezentácie…</p></div>
+</main>
+<footer><div class="wrap">Autor stránky: <b>Matúš Surmaj</b></div></footer>
+<script>
+// Zoznam prezentácií (cesta + dátum pridania) generuje pri každom nahraní GitHub Action
+// (.github/workflows/pages.yml) do prezentacie.json – stačí do repozitára pridať ďalší .html súbor.
+const REPO='MatusSurmaj/tretiaci',BRANCH='main';
+const list=document.getElementById('list'),cnt=document.getElementById('cnt'),q=document.getElementById('q');
+let items=null;
+
+async function files(){
+  try{const r=await fetch('prezentacie.json',{cache:'no-cache'});if(r.ok)return (await r.json()).map(f=>typeof f==='string'?{path:f}:f)}catch{}
+  // prezentacie.json chýba (lokálne alebo pred prvým nasadením cez Actions) – skús verejné GitHub API (bez dátumov)
+  const r=await fetch(`https://api.github.com/repos/${REPO}/git/trees/${BRANCH}?recursive=1`);
+  if(!r.ok)throw new Error('GitHub API '+r.status);
+  return (await r.json()).tree.filter(e=>e.type==='blob'&&/\.html?$/i.test(e.path)&&e.path!=='index.html').map(e=>({path:e.path}));
+}
+
+async function load(url){
+  try{const r=await fetch(url);if(r.ok)return await r.text()}catch{}
+  return '';
+}
+
+// malé písmená bez diakritiky, aby "obstaravanie" našlo aj "obstarávanie"
+const norm=s=>s.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+
+async function info({path,date}){
+  // na GitHub Pages sa súbor načíta priamo, lokálne (file://) z raw.githubusercontent.com
+  const html=await load(encodeURI(path))||await load(`https://raw.githubusercontent.com/${REPO}/${BRANCH}/${encodeURI(path)}`);
+  const d=new DOMParser().parseFromString(html,'text/html');
+  const t=s=>d.querySelector(s)?.textContent.trim()||'';
+  const tag=t('.tag');
+  const p={
+    path,
+    date:date?new Date(date):null,
+    title:t('title')||path.split('/').pop().replace(/\.html?$/i,'').replace(/[-_]+/g,' '),
+    num:/^\d+(\.\d+)*$/.test(tag)?tag:'',
+    desc:d.querySelector('meta[name="description"]')?.content.trim()||t('.sub')||t('.subtitle'),
+    slides:d.querySelectorAll('.slide').length
+  };
+  d.querySelectorAll('script,style,template').forEach(e=>e.remove());
+  p.text=norm([p.title,p.num,p.desc,d.body?.textContent||''].join(' '));
+  return p;
+}
+
+const slides=n=>n+' '+(n===1?'snímka':n>=2&&n<=4?'snímky':'snímok');
+
+function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text)e.textContent=text;return e}
+
+function card(p){
+  const a=el('a','c');a.href=encodeURI(p.path);
+  if(p.num)a.append(el('span','num',p.num));
+  a.append(el('b','',p.title));
+  if(p.desc)a.append(el('span','desc',p.desc));
+  const m=el('div','meta');
+  if(p.date){const tm=el('time','',p.date.toLocaleDateString('sk-SK'));tm.dateTime=p.date.toISOString();m.append(tm)}
+  if(p.slides)m.append(el('span','',slides(p.slides)));
+  m.append(el('i','','Otvoriť →'));
+  a.append(m);
+  return a;
+}
+
+function msg(text){list.replaceChildren(el('p','msg',text))}
+
+function render(){
+  if(!items)return;
+  const terms=norm(q.value).split(/\s+/).filter(Boolean);
+  const shown=items.filter(p=>terms.every(w=>p.text.includes(w)));
+  cnt.textContent=!items.length?'':terms.length?`(${shown.length} z ${items.length})`:`(${items.length})`;
+  if(!items.length)return msg('Zatiaľ tu nie sú žiadne prezentácie.');
+  if(!shown.length)return msg(`Pre „${q.value.trim()}“ sa nenašla žiadna prezentácia.`);
+  list.replaceChildren(...shown.map(card));
+}
+
+q.addEventListener('input',render);
+
+(async()=>{
+  try{
+    items=await Promise.all((await files()).map(info));
+    // najnovšie hore; prezentácie bez dátumu na koniec podľa názvu
+    items.sort((a,b)=>(b.date||0)-(a.date||0)||a.title.localeCompare(b.title,'sk'));
+    render();
+  }catch(e){
+    msg('Prezentácie sa nepodarilo načítať. Skús obnoviť stránku o chvíľu.');
+  }
+})();
+</script>
+</body>
+</html>

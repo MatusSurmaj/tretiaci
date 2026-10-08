@@ -1,0 +1,44 @@
+name: Nasadenie na GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # celá história – potrebná na zistenie dátumu pridania prezentácie
+
+      # zoznam všetkých .html súborov okrem index.html aj s dátumom ich pridania, číta ho hlavná stránka
+      - name: Vygenerovať prezentacie.json
+        run: |
+          find . -type f \( -iname '*.html' -o -iname '*.htm' \) -not -path './.*' -not -path './index.html' \
+            | sed 's#^\./##' | sort | while IFS= read -r f; do
+              jq -n --arg path "$f" --arg date "$(git log --follow --format=%aI -- "$f" | tail -1)" '{$path,$date}'
+            done | jq -s . > prezentacie.json
+          cat prezentacie.json
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: .
+
+      - id: deployment
+        uses: actions/deploy-pages@v5
